@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { getRandomReflection, CognitiveStateId } from '@/lib/content-templates';
+
+function stateNameToId(name: string): CognitiveStateId {
+  return name.toLowerCase().replace(/\s+/g, '-') as CognitiveStateId;
+}
 
 interface PendingDecision {
   id: string;
@@ -52,6 +57,56 @@ export default function OutcomeSignal() {
       })
       .eq('decision_id', decision.id)
       .eq('user_id', user.id);
+
+    // Get user profile for accelerated timers
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('pilot_accelerated_timers')
+      .eq('id', user.id)
+      .single();
+    const accelerated = profileData?.pilot_accelerated_timers;
+
+    // Schedule post_outcome reflection
+    const ratingLabel = rating === 'better' ? 'better than expected'
+      : rating === 'harder' ? 'harder than expected' : 'about as expected';
+
+    const stateId = decision.detected_state_at_decision
+      ? stateNameToId(decision.detected_state_at_decision) : null;
+
+    const reflectionTemplate = stateId
+      ? getRandomReflection(stateId, 'post_outcome') : null;
+
+    const promptText = reflectionTemplate
+      ? reflectionTemplate.template
+          .replace('{outcome}', ratingLabel)
+      : `Your system recorded this decision. It went ${ratingLabel}. What do you notice?`;
+
+    const reflectionDue = new Date(
+      Date.now() + (accelerated ? 1 * 60 * 1000 : 60 * 60 * 1000)
+    ).toISOString();
+
+    await supabase.from('reflections').insert({
+      user_id: user.id,
+      decision_id: decision.id,
+      reflection_type: 'post_outcome',
+      prompt_text: promptText,
+      reflection_due_at: reflectionDue,
+    });
+
+    // Trigger pattern detection in background
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (authSession) {
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/detect-patterns`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authSession.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+        }).catch(() => {}); // Fire and forget
+      }
+    } catch {}
 
     // Navigate to confirmation, passing the rating
     navigate('/outcome-confirmation', { state: { rating } });

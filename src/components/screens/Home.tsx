@@ -78,6 +78,31 @@ export default function Home() {
     const lastSession = lastSessionRes.data;
     const metrics = metricsRes.data;
 
+    // Expire outcomes older than 72h (or 10min if accelerated)
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('pilot_accelerated_timers')
+      .eq('id', user.id)
+      .single();
+    const accelerated = profileData?.pilot_accelerated_timers;
+    const expiryMs = accelerated ? 10 * 60 * 1000 : 72 * 60 * 60 * 1000;
+
+    // Check for expired outcomes and mark them
+    const { data: allPendingOutcomes } = await supabase
+      .from('outcomes')
+      .select('id, created_at')
+      .eq('user_id', user.id)
+      .is('outcome_rating', null)
+      .eq('outcome_expired', false);
+
+    if (allPendingOutcomes) {
+      for (const o of allPendingOutcomes) {
+        if (Date.now() - new Date(o.created_at).getTime() > expiryMs) {
+          await supabase.from('outcomes').update({ outcome_expired: true }).eq('id', o.id);
+        }
+      }
+    }
+
     // Determine CTA state by priority
     let ctaState: 1 | 2 | 3 | 4 = 4;
     let pendingOutcomeDecisionId: string | null = null;

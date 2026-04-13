@@ -5,6 +5,7 @@ import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getRandomClosure } from '@/lib/content-templates';
+import { recalculateMetrics } from '@/lib/metrics';
 
 export default function SessionClose() {
   const navigate = useNavigate();
@@ -63,6 +64,9 @@ export default function SessionClose() {
           })
           .eq('id', session.decisionId);
       }
+
+      // Recalculate metrics
+      await recalculateMetrics(user.id);
     };
 
     closeSession();

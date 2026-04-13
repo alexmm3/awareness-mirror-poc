@@ -1,15 +1,100 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { SUB_PROMPTS } from '@/lib/content-templates';
+import { recalculateMetrics } from '@/lib/metrics';
 
-// TODO Phase C: Load real pattern + reflection from DB, save response + IAS
+interface ReflectionData {
+  id: string;
+  prompt_text: string;
+  pattern_text: string | null;
+  pattern_confidence: number;
+  pattern_decisions: number;
+  detected_state: string | null;
+  outcome_rating: string | null;
+}
+
+const ratingLabels: Record<string, string> = {
+  better: 'BETTER THAN EXPECTED',
+  as_expected: 'AS EXPECTED',
+  harder: 'HARDER THAN EXPECTED',
+};
 
 export default function ReflectionB() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [reflection, setReflection] = useState<ReflectionData | null>(null);
   const [text, setText] = useState('');
   const [expanded, setExpanded] = useState<number[]>([]);
   const [showIAS, setShowIAS] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('reflections')
+      .select('id, prompt_text, decision_id, pattern_id')
+      .eq('user_id', user.id)
+      .eq('reflection_type', 'post_pattern')
+      .is('completed_at', null)
+      .order('reflection_due_at', { ascending: true })
+      .limit(1)
+      .single()
+      .then(async ({ data }) => {
+        if (!data) {
+          setLoading(false);
+          return;
+        }
+
+        let pattern_text: string | null = null;
+        let pattern_confidence = 0;
+        let pattern_decisions = 0;
+        let detected_state: string | null = null;
+        let outcome_rating: string | null = null;
+
+        if (data.pattern_id) {
+          const { data: patData } = await supabase
+            .from('patterns')
+            .select('pattern_text, pattern_confidence, supporting_session_ids')
+            .eq('id', data.pattern_id)
+            .single();
+          if (patData) {
+            pattern_text = patData.pattern_text;
+            pattern_confidence = patData.pattern_confidence;
+            pattern_decisions = patData.supporting_session_ids?.length || 0;
+          }
+        }
+
+        if (data.decision_id) {
+          const { data: decData } = await supabase
+            .from('decisions')
+            .select('detected_state_at_decision')
+            .eq('id', data.decision_id)
+            .single();
+          detected_state = decData?.detected_state_at_decision || null;
+
+          const { data: outcomeData } = await supabase
+            .from('outcomes')
+            .select('outcome_rating')
+            .eq('decision_id', data.decision_id)
+            .single();
+          outcome_rating = outcomeData?.outcome_rating || null;
+        }
+
+        setReflection({
+          id: data.id,
+          prompt_text: data.prompt_text,
+          pattern_text,
+          pattern_confidence,
+          pattern_decisions,
+          detected_state,
+          outcome_rating,
+        });
+        setLoading(false);
+      });
+  }, [user]);
 
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
 
@@ -17,10 +102,64 @@ export default function ReflectionB() {
     setExpanded(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]);
   };
 
-  const handleAction = () => setShowIAS(true);
-  const handleIAS = () => {
+  const handleAction = async (submitted: boolean) => {
+    if (reflection && user) {
+      await supabase
+        .from('reflections')
+        .update({
+          response_text: submitted && text.trim() ? text.trim() : null,
+        })
+        .eq('id', reflection.id);
+    }
+    setShowIAS(true);
+  };
+
+  const handleIAS = async (response: 'yes' | 'partially' | 'no') => {
+    if (reflection && user) {
+      await supabase
+        .from('reflections')
+        .update({
+          ias_response: response,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', reflection.id);
+
+      const { data: metrics } = await supabase
+        .from('user_metrics')
+        .select('complete_loops')
+        .eq('user_id', user.id)
+        .single();
+
+      await supabase
+        .from('user_metrics')
+        .update({ complete_loops: (metrics?.complete_loops || 0) + 1 })
+        .eq('user_id', user.id);
+
+      await recalculateMetrics(user.id);
+    }
     setTimeout(() => navigate('/'), 400);
   };
+
+  if (loading) {
+    return (
+      <ScreenWrapper padBottom={false}>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="font-mono text-[12px] text-am-text-secondary loading-dots">Loading</div>
+        </div>
+      </ScreenWrapper>
+    );
+  }
+
+  if (!reflection) {
+    return (
+      <ScreenWrapper padBottom={false}>
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <div className="text-body text-am-text-secondary">No pending reflections.</div>
+          <button onClick={() => navigate('/')} className="ghost-link mt-4">Return home</button>
+        </div>
+      </ScreenWrapper>
+    );
+  }
 
   return (
     <ScreenWrapper showBack backPath="/" padBottom={false}>
@@ -29,17 +168,33 @@ export default function ReflectionB() {
         <div className="font-mono text-[11px] text-am-purple italic">post_pattern</div>
       </div>
 
-      {/* Pattern detection header — placeholder */}
-      <div className="mt-4 p-4 rounded" style={{ backgroundColor: 'hsl(270, 18%, 11%)' }}>
-        <div className="font-mono font-medium text-[10px] tracking-[0.08em] uppercase text-am-purple">PATTERN DETECTED</div>
-        <p className="font-mono text-[14px] text-am-text-primary mt-2">Pattern data loading...</p>
-        <div className="text-micro mt-2">Early signal</div>
-      </div>
+      {/* Pattern detection header */}
+      {reflection.pattern_text && (
+        <div className="mt-4 p-4 rounded" style={{ backgroundColor: 'hsl(270, 18%, 11%)' }}>
+          <div className="font-mono font-medium text-[10px] tracking-[0.08em] uppercase text-am-purple">PATTERN DETECTED</div>
+          {reflection.pattern_confidence < 1 && (
+            <div className="font-mono text-[9px] tracking-[0.08em] uppercase mt-1" style={{ color: 'hsl(258, 28%, 50%)' }}>
+              EARLY SIGNAL — NOT YET CONFIRMED
+            </div>
+          )}
+          <p className="font-mono text-[14px] text-am-text-primary mt-2">{reflection.pattern_text}</p>
+          <div className="text-micro mt-2">Based on {reflection.pattern_decisions} decisions</div>
+        </div>
+      )}
 
       <div className="divider mt-4" />
 
+      {/* Context header */}
+      {reflection.detected_state && reflection.outcome_rating && (
+        <div className="border-l-2 border-am-amber pl-3 py-2 mt-4">
+          <div className="font-mono text-[12px] text-am-text-primary">
+            {reflection.detected_state} → {ratingLabels[reflection.outcome_rating] || reflection.outcome_rating}
+          </div>
+        </div>
+      )}
+
       <p className="font-sans text-[17px] text-am-text-primary leading-[1.7] mt-4">
-        What do you make of this recurring pattern in your decision-making?
+        {reflection.prompt_text}
       </p>
 
       <textarea
@@ -73,16 +228,16 @@ export default function ReflectionB() {
 
       {!showIAS ? (
         <div className="grid grid-cols-2 gap-3 mt-6 mb-8">
-          <button onClick={handleAction} className="btn-primary btn-ghost btn-40" aria-label="Skip">SKIP →</button>
-          <button onClick={handleAction} className="btn-primary btn-purple btn-40" aria-label="Submit">SUBMIT →</button>
+          <button onClick={() => handleAction(false)} className="btn-primary btn-ghost btn-40" aria-label="Skip">SKIP →</button>
+          <button onClick={() => handleAction(true)} className="btn-primary btn-purple btn-40" aria-label="Submit">SUBMIT →</button>
         </div>
       ) : (
         <div className="animate-slide-up mt-6">
           <p className="font-sans text-[15px] text-am-text-primary">Did what you noticed feel accurate?</p>
           <div className="flex gap-2 mt-3 mb-8">
-            {['YES', 'PARTIALLY', 'NO'].map((opt) => (
-              <button key={opt} onClick={handleIAS} className="chip flex-1 justify-center" aria-label={opt}>
-                {opt}
+            {(['yes', 'partially', 'no'] as const).map((opt) => (
+              <button key={opt} onClick={() => handleIAS(opt)} className="chip flex-1 justify-center" aria-label={opt.toUpperCase()}>
+                {opt.toUpperCase()}
               </button>
             ))}
           </div>
