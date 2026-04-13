@@ -48,7 +48,7 @@ export default function Auth() {
   };
 
   return (
-    <ScreenWrapper showBack backPath="/privacy" padBottom={false}>
+    <ScreenWrapper padBottom={false}>
       <div className="flex flex-col items-center justify-center min-h-[70vh]">
         <h1 className="font-mono-display text-[22px] text-am-text-primary">
           {mode === 'signin' ? 'Sign in' : 'Create account'}

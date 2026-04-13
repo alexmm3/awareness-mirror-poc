@@ -66,7 +66,7 @@ function ProtectedRoutes() {
     if (isPublicRoute) {
       return <AppRoutes />;
     }
-    return <Navigate to="/waitlist" replace />;
+    return <Navigate to="/auth" replace />;
   }
 
   // Authenticated but onboarding not complete
@@ -77,8 +77,8 @@ function ProtectedRoutes() {
     return <Navigate to="/onboarding" replace />;
   }
 
-  // Authenticated, onboarding complete — trying to access auth/onboarding pages
-  if (location.pathname === '/waitlist' || location.pathname === '/auth') {
+  // Authenticated, onboarding complete — trying to access auth/onboarding/waitlist pages
+  if (['/waitlist', '/auth', '/onboarding', '/disclaimer', '/privacy'].includes(location.pathname)) {
     return <Navigate to="/" replace />;
   }
 

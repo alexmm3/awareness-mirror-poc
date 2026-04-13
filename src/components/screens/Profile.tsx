@@ -9,7 +9,7 @@ export default function Profile() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/waitlist');
+    navigate('/auth');
   };
 
   const handleToggleAccelerated = async () => {
