@@ -80,6 +80,10 @@ export default function MicroAction() {
   const [secondsLeft, setSecondsLeft] = useState(90);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Breathing phase tracking
+  const [breathPhase, setBreathPhase] = useState<'INHALE' | 'EXHALE'>('INHALE');
+  const breathRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     if (technique.type !== 'pause') return;
     setSecondsLeft(90);
@@ -95,6 +99,31 @@ export default function MicroAction() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [technique.type]);
 
+  // Breathing phase cycle
+  useEffect(() => {
+    if (!isBreathing) return;
+    setBreathPhase('INHALE');
+    let isInhale = true;
+    const toggle = () => {
+      isInhale = !isInhale;
+      setBreathPhase(isInhale ? 'INHALE' : 'EXHALE');
+    };
+    // Start with inhale, switch after inhale duration, then alternate
+    const startCycle = () => {
+      breathRef.current = setTimeout(() => {
+        toggle();
+        breathRef.current = setInterval(() => {
+          toggle();
+        }, totalCycle * 1000);
+      }, inhale * 1000);
+    };
+    startCycle();
+    return () => {
+      if (breathRef.current) clearTimeout(breathRef.current);
+      if (breathRef.current) clearInterval(breathRef.current);
+    };
+  }, [isBreathing, inhale, totalCycle]);
+
   return (
     <ScreenWrapper showBack backPath={`/stabilisation?technique=${techniqueId || '90-second-pause'}`} padBottom={false}>
       <div className="flex items-center justify-between mt-4">
@@ -103,34 +132,72 @@ export default function MicroAction() {
 
       {/* Breathing animation (4-6 and 4-8) */}
       {isBreathing && (
-        <div className="relative mt-8 mb-4" style={{ height: '180px' }}>
-          <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            aria-hidden="true"
-          >
+        <div className="relative mt-8 mb-4 flex flex-col items-center" style={{ height: '200px' }}>
+          <div className="relative flex items-center justify-center" style={{ width: '160px', height: '160px' }}>
+            {/* Outer ring */}
             <div
-              className="rounded-full"
+              className="absolute rounded-full border"
               style={{
-                width: '120px',
-                height: '120px',
-                backgroundColor: 'hsl(var(--accent-teal))',
-                opacity: 0.08,
+                width: '160px',
+                height: '160px',
+                borderColor: 'hsl(var(--accent-teal) / 0.15)',
                 animation: `breatheAnim ${totalCycle}s ease-in-out infinite`,
               }}
             />
+            {/* Middle ring */}
+            <div
+              className="absolute rounded-full border"
+              style={{
+                width: '120px',
+                height: '120px',
+                borderColor: 'hsl(var(--accent-teal) / 0.25)',
+                animation: `breatheAnim ${totalCycle}s ease-in-out infinite`,
+                animationDelay: '0.15s',
+              }}
+            />
+            {/* Inner glow */}
+            <div
+              className="absolute rounded-full"
+              style={{
+                width: '80px',
+                height: '80px',
+                backgroundColor: 'hsl(var(--accent-teal))',
+                opacity: 0.06,
+                animation: `breatheAnim ${totalCycle}s ease-in-out infinite`,
+                animationDelay: '0.3s',
+              }}
+            />
+            {/* Phase label */}
+            <span className="relative font-mono text-[13px] tracking-[0.12em] text-am-teal" style={{ opacity: 0.8 }}>
+              {breathPhase}
+            </span>
           </div>
         </div>
       )}
 
-      {/* Pause: timer in preserved space */}
+      {/* Pause: circular progress timer */}
       {technique.type === 'pause' && (
-        <div className="flex justify-center items-center mt-6 mb-2" style={{ height: '48px' }}>
-          <span
-            className="font-mono text-am-text-tertiary"
-            style={{ fontSize: '14px', fontVariantNumeric: 'tabular-nums' }}
-          >
-            {secondsLeft}s
-          </span>
+        <div className="flex flex-col items-center mt-6 mb-2" style={{ height: '140px' }}>
+          <div className="relative flex items-center justify-center" style={{ width: '120px', height: '120px' }}>
+            <svg width="120" height="120" className="absolute">
+              {/* Background circle */}
+              <circle cx="60" cy="60" r="54" fill="none" stroke="hsl(var(--bg-tertiary))" strokeWidth="2" />
+              {/* Progress circle */}
+              <circle
+                cx="60" cy="60" r="54" fill="none"
+                stroke="hsl(var(--accent-teal))"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 54}`}
+                strokeDashoffset={`${2 * Math.PI * 54 * (secondsLeft / 90)}`}
+                transform="rotate(-90 60 60)"
+                style={{ transition: 'stroke-dashoffset 1s linear', opacity: 0.6 }}
+              />
+            </svg>
+            <span className="font-mono text-[20px] text-am-text-primary" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {secondsLeft}s
+            </span>
+          </div>
         </div>
       )}
 

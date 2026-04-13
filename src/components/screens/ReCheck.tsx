@@ -14,10 +14,12 @@ export default function ReCheck() {
   const navigate = useNavigate();
   const { state, dispatch } = useAppContext();
   const [selected, setSelected] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const handleSelect = async (i: number) => {
-    setSelected(i);
-    const clarity = options[i].value;
+  const handleConfirm = async () => {
+    if (selected === null || saving) return;
+    setSaving(true);
+    const clarity = options[selected].value;
 
     dispatch({ type: 'SET_RECHECK', payload: clarity });
 
@@ -29,7 +31,7 @@ export default function ReCheck() {
         .eq('id', state.activeSession.id);
     }
 
-    setTimeout(() => navigate('/session-close'), 300);
+    navigate('/session-close');
   };
 
   return (
@@ -43,7 +45,7 @@ export default function ReCheck() {
         {options.map((opt, i) => (
           <button
             key={opt.label}
-            onClick={() => handleSelect(i)}
+            onClick={() => setSelected(i)}
             className={`card-surface p-4 text-left transition-all duration-150 ${
               selected === i ? 'border-am-border-active border-l-[3px] border-l-am-teal' : 'border-l-[3px] border-l-transparent'
             }`}
@@ -54,6 +56,15 @@ export default function ReCheck() {
           </button>
         ))}
       </div>
+
+      <button
+        onClick={handleConfirm}
+        disabled={selected === null || saving}
+        className={`btn-primary btn-teal mt-6 mb-8 ${selected === null ? 'opacity-40 pointer-events-none' : ''}`}
+        aria-label="Continue"
+      >
+        {saving ? 'SAVING...' : 'CONTINUE →'}
+      </button>
     </ScreenWrapper>
   );
 }

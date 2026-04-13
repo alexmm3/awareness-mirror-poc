@@ -9,6 +9,8 @@ function stateNameToId(name: string): CognitiveStateId {
   return name.toLowerCase().replace(/\s+/g, '-') as CognitiveStateId;
 }
 
+type OutcomeRating = 'better' | 'as_expected' | 'harder';
+
 interface PendingDecision {
   id: string;
   decision_text: string;
@@ -19,6 +21,8 @@ export default function OutcomeSignal() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [decision, setDecision] = useState<PendingDecision | null>(null);
+  const [selected, setSelected] = useState<OutcomeRating | null>(null);
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,8 +49,10 @@ export default function OutcomeSignal() {
       });
   }, [user]);
 
-  const handleSelect = async (rating: 'better' | 'as_expected' | 'harder') => {
-    if (!decision || !user) return;
+  const handleConfirm = async () => {
+    if (!decision || !user || !selected || saving) return;
+    setSaving(true);
+    const rating = selected;
 
     // Update outcome
     await supabase
@@ -112,7 +118,7 @@ export default function OutcomeSignal() {
     navigate('/outcome-confirmation', { state: { rating } });
   };
 
-  const options: { label: string; value: 'better' | 'as_expected' | 'harder' }[] = [
+  const options: { label: string; value: OutcomeRating }[] = [
     { label: 'Better than expected', value: 'better' },
     { label: 'About as expected', value: 'as_expected' },
     { label: 'Harder than expected', value: 'harder' },
@@ -174,14 +180,25 @@ export default function OutcomeSignal() {
           {options.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => handleSelect(opt.value)}
-              className="card-surface w-full p-4 rounded-lg text-left font-sans text-[14px] text-am-text-primary hover:border-am-border-active transition-colors"
+              onClick={() => setSelected(opt.value)}
+              className={`card-surface w-full p-4 rounded-lg text-left font-sans text-[14px] text-am-text-primary transition-colors ${
+                selected === opt.value ? 'border-am-border-active border-l-[3px] border-l-am-teal' : 'border-l-[3px] border-l-transparent'
+              }`}
               aria-label={opt.label}
             >
               {opt.label}
             </button>
           ))}
         </div>
+
+        <button
+          onClick={handleConfirm}
+          disabled={!selected || saving}
+          className={`btn-primary btn-amber mt-6 mb-8 ${!selected ? 'opacity-40 pointer-events-none' : ''}`}
+          aria-label="Confirm"
+        >
+          {saving ? 'SAVING...' : 'CONFIRM →'}
+        </button>
       </div>
     </ScreenWrapper>
   );

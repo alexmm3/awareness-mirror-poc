@@ -74,14 +74,16 @@ export default function DecisionCapture() {
 
     setConfirmed(true);
     setSaving(false);
-    setTimeout(() => navigate('/technique-selection'), 1500);
   };
 
   if (confirmed) {
     return (
       <ScreenWrapper padBottom={false}>
         <div className="flex flex-col items-center justify-center min-h-[60vh]">
-          <p className="font-mono font-medium text-[14px] text-am-teal">Decision logged. Continuing session.</p>
+          <p className="font-mono font-medium text-[14px] text-am-teal">Decision logged.</p>
+          <button onClick={() => navigate('/technique-selection')} className="btn-primary btn-teal mt-6 w-48" aria-label="Continue">
+            CONTINUE →
+          </button>
         </div>
       </ScreenWrapper>
     );

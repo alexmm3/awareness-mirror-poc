@@ -4,6 +4,29 @@ import ScreenWrapper from '@/components/shared/ScreenWrapper';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 
+function MetricCell({ label, value, tooltip }: { label: string; value: string; tooltip: string }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const isBuilding = value === 'BUILDING...';
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => isBuilding && setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      onClick={() => isBuilding && setShowTooltip(!showTooltip)}
+    >
+      <div className="text-label text-[10px]">{label}</div>
+      <div className={`font-mono font-medium text-[14px] mt-1 ${isBuilding ? 'text-am-text-tertiary italic text-[12px] cursor-help' : 'text-am-teal'}`}>
+        {value}
+      </div>
+      {showTooltip && (
+        <div className="absolute z-50 left-0 top-full mt-1 p-2 bg-am-bg-tertiary border border-am-border rounded text-[11px] text-am-text-secondary font-mono w-48 shadow-lg">
+          {tooltip}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface HomeData {
   lastState: string | null;
   lastActivation: number;
@@ -171,7 +194,7 @@ export default function Home() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <span className="text-label">AWARENESS MIRROR</span>
-          <button onClick={() => navigate('/profile')} className="ghost-link text-[11px]" aria-label="Settings">⚙</button>
+          <button onClick={() => navigate('/profile')} className="ghost-link text-[18px] w-10 h-10 flex items-center justify-center" aria-label="Settings">⚙</button>
         </div>
 
         <div className="divider mt-3" />
@@ -201,24 +224,9 @@ export default function Home() {
 
         {/* Metrics */}
         <div className="grid grid-cols-3 py-4 gap-2">
-          <div>
-            <div className="text-label text-[10px]">OBSERVER</div>
-            <div className={`font-mono font-medium text-[14px] mt-1 ${data.observerTrend === 'BUILDING...' ? 'text-am-text-tertiary italic text-[12px]' : 'text-am-teal'}`}>
-              {data.observerTrend}
-            </div>
-          </div>
-          <div>
-            <div className="text-label text-[10px]">CNR</div>
-            <div className={`font-mono font-medium text-[14px] mt-1 ${data.cnrTrend === 'BUILDING...' ? 'text-am-text-tertiary italic text-[12px]' : 'text-am-teal'}`}>
-              {data.cnrTrend}
-            </div>
-          </div>
-          <div>
-            <div className="text-label text-[10px]">DCI</div>
-            <div className={`font-mono text-[13px] mt-1 ${data.dci === 'BUILDING...' ? 'text-am-text-tertiary italic' : 'text-am-teal font-medium text-[14px]'}`}>
-              {data.dci}
-            </div>
-          </div>
+          <MetricCell label="OBSERVER" value={data.observerTrend} tooltip="Self-perception accuracy. Requires 5+ sessions with reflection responses." />
+          <MetricCell label="CNR" value={data.cnrTrend} tooltip="Cognitive Noise Reduction. Based on your clarity shifts across recent sessions." />
+          <MetricCell label="DCI" value={data.dci} tooltip="Decision Clarity Index. Percentage of decisions made from regulated states." />
         </div>
 
         <div className="divider" />
