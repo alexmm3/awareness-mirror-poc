@@ -22,7 +22,7 @@ export default function DecisionCapture() {
 
   const decisionWords = decision.trim() ? decision.trim().split(/\s+/).length : 0;
   const outcomeWords = outcome.trim() ? outcome.trim().split(/\s+/).length : 0;
-  const canSubmit = decisionWords >= 5 && outcomeWords >= 5 && type !== '';
+  const canSubmit = decision.trim().length >= 3 && outcome.trim().length >= 3 && type !== '';
 
   const handleSubmit = async () => {
     if (!canSubmit || !user || saving) return;

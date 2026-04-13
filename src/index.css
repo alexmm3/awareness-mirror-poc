@@ -72,6 +72,14 @@
     height: 100%;
   }
 
+  /* Hide scrollbar but keep scroll functional (#13) */
+  html {
+    scrollbar-width: none; /* Firefox */
+  }
+  html::-webkit-scrollbar {
+    display: none; /* Chrome, Safari */
+  }
+
   body {
     font-family: 'IBM Plex Sans', -apple-system, sans-serif;
     background-color: hsl(var(--bg-primary));
@@ -269,7 +277,10 @@
     color: hsl(var(--text-primary));
     resize: none;
     outline: none;
+    overflow: hidden;
     transition: border-color 160ms ease-out;
+    field-sizing: content;
+    min-height: 80px;
   }
 
   .textarea-am::placeholder {

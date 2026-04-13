@@ -12,7 +12,7 @@ export default function StateCapture() {
   const [tags, setTags] = useState<string[]>([]);
 
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
-  const canSubmit = wordCount >= 10 && tags.length >= 1;
+  const canSubmit = text.trim().length >= 3 && tags.length >= 1;
 
   const toggleTag = (tag: string) => {
     if (tags.includes(tag)) {

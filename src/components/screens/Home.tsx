@@ -4,9 +4,33 @@ import ScreenWrapper from '@/components/shared/ScreenWrapper';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 
-function MetricCell({ label, value, tooltip }: { label: string; value: string; tooltip: string }) {
+// Metric display helper: shows counter when building, trend when ready
+function formatMetric(
+  type: 'observer' | 'cnr' | 'dci',
+  metrics: { total_sessions: number; complete_loops: number; observer_strength_trend: string | null; cnr_trend: string | null; dci_score: number | null },
+  decisionCount: number
+): { value: string; isBuilding: boolean } {
+  if (type === 'observer') {
+    if (metrics.total_sessions >= 5 && metrics.observer_strength_trend) {
+      return { value: metrics.observer_strength_trend.toUpperCase(), isBuilding: false };
+    }
+    return { value: `${metrics.total_sessions} / 5`, isBuilding: true };
+  }
+  if (type === 'cnr') {
+    if (metrics.total_sessions >= 3 && metrics.cnr_trend) {
+      return { value: metrics.cnr_trend.toUpperCase(), isBuilding: false };
+    }
+    return { value: `${metrics.total_sessions} session${metrics.total_sessions !== 1 ? 's' : ''}`, isBuilding: true };
+  }
+  // dci
+  if (decisionCount > 0 && metrics.dci_score != null) {
+    return { value: `${Math.round(metrics.dci_score)}%`, isBuilding: false };
+  }
+  return { value: `${decisionCount} decision${decisionCount !== 1 ? 's' : ''}`, isBuilding: true };
+}
+
+function MetricCell({ label, value, isBuilding, tooltip }: { label: string; value: string; isBuilding: boolean; tooltip: string }) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const isBuilding = value === 'BUILDING...';
   return (
     <div
       className="relative"
@@ -31,9 +55,11 @@ interface HomeData {
   lastState: string | null;
   lastActivation: number;
   lastSessionAgo: string;
-  observerTrend: string;
-  cnrTrend: string;
-  dci: string;
+  userRole: string | null;
+  userDecisionType: string | null;
+  observer: { value: string; isBuilding: boolean };
+  cnr: { value: string; isBuilding: boolean };
+  dci: { value: string; isBuilding: boolean };
   ctaState: 1 | 2 | 3 | 4;
   pendingOutcomeDecisionId: string | null;
   pendingReflectionId: string | null;
@@ -52,10 +78,13 @@ function timeAgo(dateStr: string): string {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [data, setData] = useState<HomeData>({
     lastState: null, lastActivation: 0, lastSessionAgo: '',
-    observerTrend: 'BUILDING...', cnrTrend: 'BUILDING...', dci: 'BUILDING...',
+    userRole: null, userDecisionType: null,
+    observer: { value: '0 / 5', isBuilding: true },
+    cnr: { value: '0 sessions', isBuilding: true },
+    dci: { value: '0 decisions', isBuilding: true },
     ctaState: 4, pendingOutcomeDecisionId: null,
     pendingReflectionId: null, pendingReflectionType: null,
   });
@@ -71,9 +100,9 @@ export default function Home() {
     const now = new Date().toISOString();
 
     // Parallel queries
-    const [lastSessionRes, metricsRes, pendingOutcomeRes, pendingReflectionRes, patternsRes] = await Promise.all([
+    const [lastSessionRes, metricsRes, pendingOutcomeRes, pendingReflectionRes, patternsRes, decisionCountRes] = await Promise.all([
       supabase.from('sessions').select('detected_state, activation_level, user_corrected_state, created_at')
-        .eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).single(),
+        .eq('user_id', user.id).not('detected_state', 'is', null).order('created_at', { ascending: false }).limit(1).single(),
       supabase.from('user_metrics').select('*').eq('user_id', user.id).single(),
       supabase.from('outcomes')
         .select('id, decision_id, decisions!inner(outcome_signal_due_at)')
@@ -96,6 +125,9 @@ export default function Home() {
         .eq('viewed', false)
         .limit(1)
         .single(),
+      supabase.from('decisions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id),
     ]);
 
     const lastSession = lastSessionRes.data;
@@ -153,13 +185,24 @@ export default function Home() {
       ctaState = 3;
     }
 
+    const decisionCount = decisionCountRes.count || 0;
+    const metricsData = {
+      total_sessions: metrics?.total_sessions || 0,
+      complete_loops: metrics?.complete_loops || 0,
+      observer_strength_trend: metrics?.observer_strength_trend,
+      cnr_trend: metrics?.cnr_trend,
+      dci_score: metrics?.dci_score,
+    };
+
     setData({
       lastState: lastSession ? (lastSession.user_corrected_state || lastSession.detected_state) : null,
       lastActivation: lastSession?.activation_level || 0,
       lastSessionAgo: lastSession ? timeAgo(lastSession.created_at) : '',
-      observerTrend: metrics?.observer_strength_trend?.toUpperCase() || 'BUILDING...',
-      cnrTrend: metrics?.cnr_trend?.toUpperCase() || 'BUILDING...',
-      dci: metrics?.dci_score != null ? `${Math.round(metrics.dci_score)}%` : 'BUILDING...',
+      userRole: profile?.role || null,
+      userDecisionType: profile?.decision_type || null,
+      observer: formatMetric('observer', metricsData, decisionCount),
+      cnr: formatMetric('cnr', metricsData, decisionCount),
+      dci: formatMetric('dci', metricsData, decisionCount),
       ctaState,
       pendingOutcomeDecisionId,
       pendingReflectionId,
@@ -216,7 +259,14 @@ export default function Home() {
           </div>
         ) : (
           <div className="py-4">
-            <div className="font-mono text-[14px] text-am-text-secondary italic">No sessions yet</div>
+            {data.userRole && (
+              <div className="font-mono font-medium text-[14px] text-am-text-primary">
+                {data.userRole}{data.userDecisionType ? ` · ${data.userDecisionType}` : ''}
+              </div>
+            )}
+            <div className="font-mono text-[12px] text-am-text-tertiary mt-1">
+              Your first session will establish a baseline.
+            </div>
           </div>
         )}
 
@@ -224,9 +274,9 @@ export default function Home() {
 
         {/* Metrics */}
         <div className="grid grid-cols-3 py-4 gap-2">
-          <MetricCell label="OBSERVER" value={data.observerTrend} tooltip="Self-perception accuracy. Requires 5+ sessions with reflection responses." />
-          <MetricCell label="CNR" value={data.cnrTrend} tooltip="Cognitive Noise Reduction. Based on your clarity shifts across recent sessions." />
-          <MetricCell label="DCI" value={data.dci} tooltip="Decision Clarity Index. Percentage of decisions made from regulated states." />
+          <MetricCell label="OBSERVER" value={data.observer.value} isBuilding={data.observer.isBuilding} tooltip="Self-perception accuracy. Requires 5+ sessions with reflection responses." />
+          <MetricCell label="CNR" value={data.cnr.value} isBuilding={data.cnr.isBuilding} tooltip="Cognitive Noise Reduction. Based on clarity shifts across recent sessions." />
+          <MetricCell label="DCI" value={data.dci.value} isBuilding={data.dci.isBuilding} tooltip="Decision Clarity Index. Percentage of decisions from regulated states." />
         </div>
 
         <div className="divider" />

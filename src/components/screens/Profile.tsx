@@ -22,7 +22,7 @@ export default function Profile() {
   };
 
   return (
-    <ScreenWrapper padBottom>
+    <ScreenWrapper showBack backPath="/" padBottom>
       <div className="text-label mt-4">PROFILE & SETTINGS</div>
       <div className="divider mt-3" />
 

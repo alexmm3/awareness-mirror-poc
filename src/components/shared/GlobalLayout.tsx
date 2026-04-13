@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import BottomNav from '@/components/shared/BottomNav';
+import FeedbackButton from '@/components/shared/FeedbackButton';
 import { useAuth } from '@/context/AuthContext';
 
 // Screens where bottom nav is hidden (session flow + auth/onboarding)
@@ -27,6 +28,7 @@ export default function GlobalLayout({ children }: { children: React.ReactNode }
     <>
       {children}
       {showNav && <BottomNav />}
+      <FeedbackButton />
     </>
   );
 }
