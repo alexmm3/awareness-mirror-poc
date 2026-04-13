@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
 import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
@@ -40,84 +40,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
+  const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+      if (!error && data) {
+        return data as Profile
+      }
+    } catch {}
+    return null
+  }, [])
 
-    if (!error && data) {
-      setProfile(data as Profile)
-    }
-  }
-
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user) {
-      await fetchProfile(user.id)
+      const p = await fetchProfile(user.id)
+      if (p) setProfile(p)
     }
-  }
+  }, [user, fetchProfile])
 
   useEffect(() => {
     let mounted = true
+    let initialized = false
 
-    // Safety timeout: never stay in loading state for more than 5 seconds
-    const safetyTimeout = setTimeout(() => {
-      if (mounted) {
-        console.warn('Auth init safety timeout reached')
-        setLoading(false)
-      }
-    }, 5000)
-
-    const init = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!mounted) return
-        setSession(session)
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-          if (mounted && data) setProfile(data as Profile)
-        }
-      } catch (err) {
-        console.error('Auth init error:', err)
-      } finally {
-        clearTimeout(safetyTimeout)
-        if (mounted) setLoading(false)
-      }
-    }
-
-    init()
-
-    // Listen for auth changes
+    // Single initialization: use onAuthStateChange as the primary source.
+    // Supabase fires INITIAL_SESSION event on startup with the cached session.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, newSession) => {
         if (!mounted) return
-        setSession(session)
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-          if (mounted && data) setProfile(data as Profile)
+
+        setSession(newSession)
+        setUser(newSession?.user ?? null)
+
+        if (newSession?.user) {
+          // Fetch profile — use setTimeout to avoid Supabase auth deadlock
+          // (known issue: calling supabase functions inside onAuthStateChange callback)
+          setTimeout(async () => {
+            if (!mounted) return
+            const p = await fetchProfile(newSession.user.id)
+            if (mounted) {
+              setProfile(p)
+              if (!initialized) {
+                initialized = true
+                setLoading(false)
+              }
+            }
+          }, 0)
         } else {
           setProfile(null)
+          if (!initialized) {
+            initialized = true
+            setLoading(false)
+          }
         }
-        setLoading(false)
       }
     )
 
+    // Safety timeout: if onAuthStateChange never fires (shouldn't happen, but just in case)
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && !initialized) {
+        console.warn('Auth safety timeout — forcing loading=false')
+        initialized = true
+        setLoading(false)
+      }
+    }, 8000)
+
     return () => {
       mounted = false
+      clearTimeout(safetyTimeout)
       subscription.unsubscribe()
     }
-  }, [])
+  }, [fetchProfile])
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })
