@@ -54,7 +54,7 @@ export default function History() {
                   {new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </div>
                 <div className="font-mono text-[11px] text-am-text-primary mt-1">
-                  {s.user_corrected_state || s.detected_state || '—'}
+                  {s.user_corrected_state || s.detected_state || typeLabels[s.session_type] || s.session_type}
                 </div>
               </div>
               <span className="text-micro">{typeLabels[s.session_type] || s.session_type}</span>

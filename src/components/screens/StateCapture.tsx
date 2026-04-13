@@ -46,7 +46,7 @@ export default function StateCapture() {
       <textarea
         className="textarea-am mt-6"
         style={{ minHeight: 160 }}
-        placeholder="Write freely. Minimum 10 words."
+        placeholder="Write freely."
         value={text}
         onChange={(e) => setText(e.target.value.slice(0, 1800))}
         maxLength={1800}

@@ -4,6 +4,7 @@ import ScreenWrapper from '@/components/shared/ScreenWrapper';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { getRecommendedTechnique, CognitiveStateId } from '@/lib/content-templates';
 
 const DECISION_TYPES = ['People', 'Money', 'Strategy', 'Operations'];
 
@@ -70,6 +71,27 @@ export default function DecisionCapture() {
         decision_id: decisionData.id,
         user_id: user.id,
       });
+
+      // For standalone decision capture (no active session with classification),
+      // set outcome_signal_due_at immediately since SessionClose won't be reached
+      const isStandalone = !session?.classification;
+      if (isStandalone) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('pilot_accelerated_timers')
+          .eq('id', user.id)
+          .single();
+        const accelerated = profileData?.pilot_accelerated_timers;
+        const now = new Date();
+        const outcomeDue = new Date(
+          now.getTime() + (accelerated ? 2 * 60 * 1000 : 48 * 60 * 60 * 1000)
+        ).toISOString();
+
+        await supabase
+          .from('decisions')
+          .update({ outcome_signal_due_at: outcomeDue })
+          .eq('id', decisionData.id);
+      }
     }
 
     setConfirmed(true);
@@ -77,12 +99,24 @@ export default function DecisionCapture() {
   };
 
   if (confirmed) {
+    const hasActiveFlow = !!session?.classification;
+    const handleContinue = () => {
+      if (hasActiveFlow) {
+        const stateId = (session?.userCorrectedState || session?.classification?.detected_state || '')
+          .toLowerCase().replace(/\s+/g, '-') as CognitiveStateId;
+        const technique = getRecommendedTechnique(stateId) || 'breathing-4-6';
+        navigate(`/stabilisation?technique=${technique}`);
+      } else {
+        navigate('/');
+      }
+    };
+
     return (
       <ScreenWrapper padBottom={false}>
         <div className="flex flex-col items-center justify-center min-h-[60vh]">
           <p className="font-mono font-medium text-[14px] text-am-teal">Decision logged.</p>
-          <button onClick={() => navigate('/technique-selection')} className="btn-primary btn-teal mt-6 w-48" aria-label="Continue">
-            CONTINUE →
+          <button onClick={handleContinue} className="btn-primary btn-teal mt-6 w-48" aria-label="Continue">
+            {hasActiveFlow ? 'CONTINUE →' : 'DONE →'}
           </button>
         </div>
       </ScreenWrapper>

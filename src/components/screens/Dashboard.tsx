@@ -54,7 +54,9 @@ export default function Dashboard() {
     ]);
 
     const sessions = sessionsRes.data || [];
-    setTotalSessions(sessions.length);
+    // Count only classified sessions toward the threshold
+    const classifiedSessions = sessions.filter(s => s.detected_state || s.user_corrected_state);
+    setTotalSessions(classifiedSessions.length);
 
     // State frequency
     const freqMap: Record<string, number> = {};
