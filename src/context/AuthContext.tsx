@@ -59,23 +59,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchProfile(session.user.id)
+    let mounted = true
+
+    // Safety timeout: never stay in loading state for more than 5 seconds
+    const safetyTimeout = setTimeout(() => {
+      if (mounted) {
+        console.warn('Auth init safety timeout reached')
+        setLoading(false)
       }
-      setLoading(false)
-    })
+    }, 5000)
+
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!mounted) return
+        setSession(session)
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+          if (mounted && data) setProfile(data as Profile)
+        }
+      } catch (err) {
+        console.error('Auth init error:', err)
+      } finally {
+        clearTimeout(safetyTimeout)
+        if (mounted) setLoading(false)
+      }
+    }
+
+    init()
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        if (!mounted) return
         setSession(session)
         setUser(session?.user ?? null)
         if (session?.user) {
-          await fetchProfile(session.user.id)
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+          if (mounted && data) setProfile(data as Profile)
         } else {
           setProfile(null)
         }
@@ -83,7 +113,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signUp = async (email: string, password: string) => {
