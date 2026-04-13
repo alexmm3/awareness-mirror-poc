@@ -1,19 +1,34 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
+import { useAppContext } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 
 const options = [
-  { label: 'CLEARER', sub: 'The quality of my thinking has improved.' },
-  { label: 'SAME', sub: 'No significant shift in internal clarity.' },
-  { label: 'CLOUDIER', sub: 'My thinking feels more activated or constrained.' },
+  { label: 'CLEARER', value: 'clearer' as const, sub: 'The quality of my thinking has improved.' },
+  { label: 'SAME', value: 'same' as const, sub: 'No significant shift in internal clarity.' },
+  { label: 'CLOUDIER', value: 'cloudier' as const, sub: 'My thinking feels more activated or constrained.' },
 ];
 
 export default function ReCheck() {
   const navigate = useNavigate();
+  const { state, dispatch } = useAppContext();
   const [selected, setSelected] = useState<number | null>(null);
 
-  const handleSelect = (i: number) => {
+  const handleSelect = async (i: number) => {
     setSelected(i);
+    const clarity = options[i].value;
+
+    dispatch({ type: 'SET_RECHECK', payload: clarity });
+
+    // Persist to DB
+    if (state.activeSession?.id) {
+      await supabase
+        .from('sessions')
+        .update({ recheck_clarity: clarity })
+        .eq('id', state.activeSession.id);
+    }
+
     setTimeout(() => navigate('/session-close'), 300);
   };
 

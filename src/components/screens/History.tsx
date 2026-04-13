@@ -1,32 +1,67 @@
+import { useEffect, useState } from 'react';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
+interface SessionRow {
+  id: string;
+  detected_state: string | null;
+  user_corrected_state: string | null;
+  session_type: string;
+  created_at: string;
+}
 
-const sessions = [
-  { date: 'Mar 16, 2026', state: 'Anxious Vigilance', type: 'State Capture' },
-  { date: 'Mar 14, 2026', state: 'Focused Tension', type: 'Decision Capture' },
-  { date: 'Mar 12, 2026', state: 'Anxious Vigilance', type: 'State Capture' },
-  { date: 'Mar 10, 2026', state: 'Calm Readiness', type: 'State Capture' },
-  { date: 'Mar 8, 2026', state: 'Cognitive Depletion', type: 'High-Pressure' },
-  { date: 'Mar 6, 2026', state: 'Focused Tension', type: 'State Capture' },
-];
+const typeLabels: Record<string, string> = {
+  state_capture: 'State Capture',
+  decision_capture: 'Decision Capture',
+  high_pressure_signal: 'High-Pressure',
+};
 
 export default function History() {
-  return (
-      <ScreenWrapper padBottom>
-        <div className="text-label mt-4">SESSION HISTORY</div>
-        <div className="divider mt-3" />
+  const { user } = useAuth();
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('sessions')
+      .select('id, detected_state, user_corrected_state, session_type, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        setSessions(data || []);
+        setLoading(false);
+      });
+  }, [user]);
+
+  return (
+    <ScreenWrapper padBottom>
+      <div className="text-label mt-4">SESSION HISTORY</div>
+      <div className="divider mt-3" />
+
+      {loading ? (
+        <div className="font-mono text-[12px] text-am-text-secondary loading-dots mt-6">Loading</div>
+      ) : sessions.length === 0 ? (
+        <div className="mt-6 text-body text-am-text-secondary italic">No sessions yet.</div>
+      ) : (
         <div className="space-y-0 mt-2">
-          {sessions.map((s, i) => (
-            <div key={i} className="flex items-center justify-between py-3 border-b border-am-border">
+          {sessions.map((s) => (
+            <div key={s.id} className="flex items-center justify-between py-3 border-b border-am-border">
               <div>
-                <div className="text-micro">{s.date}</div>
-                <div className="font-mono text-[11px] text-am-text-primary mt-1">{s.state}</div>
+                <div className="text-micro">
+                  {new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
+                <div className="font-mono text-[11px] text-am-text-primary mt-1">
+                  {s.user_corrected_state || s.detected_state || '—'}
+                </div>
               </div>
-              <span className="text-micro">{s.type}</span>
+              <span className="text-micro">{typeLabels[s.session_type] || s.session_type}</span>
             </div>
           ))}
         </div>
-      </ScreenWrapper>
+      )}
+    </ScreenWrapper>
   );
 }

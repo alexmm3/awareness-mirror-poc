@@ -1,19 +1,88 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
-import { MOCK_DATA } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
+
+interface PendingDecision {
+  id: string;
+  decision_text: string;
+  detected_state_at_decision: string | null;
+}
 
 export default function OutcomeSignal() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [decision, setDecision] = useState<PendingDecision | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleSelect = () => {
-    navigate('/outcome-confirmation');
+  useEffect(() => {
+    if (!user) return;
+    // Find the oldest pending outcome signal
+    supabase
+      .from('outcomes')
+      .select('decision_id, decisions!inner(id, decision_text, detected_state_at_decision, outcome_signal_due_at)')
+      .eq('user_id', user.id)
+      .is('outcome_rating', null)
+      .eq('outcome_expired', false)
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          const d = data.decisions as any;
+          setDecision({
+            id: d.id,
+            decision_text: d.decision_text,
+            detected_state_at_decision: d.detected_state_at_decision,
+          });
+        }
+        setLoading(false);
+      });
+  }, [user]);
+
+  const handleSelect = async (rating: 'better' | 'as_expected' | 'harder') => {
+    if (!decision || !user) return;
+
+    // Update outcome
+    await supabase
+      .from('outcomes')
+      .update({
+        outcome_rating: rating,
+        outcome_received_at: new Date().toISOString(),
+      })
+      .eq('decision_id', decision.id)
+      .eq('user_id', user.id);
+
+    // Navigate to confirmation, passing the rating
+    navigate('/outcome-confirmation', { state: { rating } });
   };
 
-  const options = [
-    'Better than expected',
-    'About as expected',
-    'Harder than expected',
+  const options: { label: string; value: 'better' | 'as_expected' | 'harder' }[] = [
+    { label: 'Better than expected', value: 'better' },
+    { label: 'About as expected', value: 'as_expected' },
+    { label: 'Harder than expected', value: 'harder' },
   ];
+
+  if (loading) {
+    return (
+      <ScreenWrapper padBottom={false}>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="font-mono text-[12px] text-am-text-secondary loading-dots">Loading</div>
+        </div>
+      </ScreenWrapper>
+    );
+  }
+
+  if (!decision) {
+    return (
+      <ScreenWrapper padBottom={false}>
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <div className="text-body text-am-text-secondary">No pending outcome signals.</div>
+          <button onClick={() => navigate('/')} className="ghost-link mt-4">Return home</button>
+        </div>
+      </ScreenWrapper>
+    );
+  }
 
   return (
     <ScreenWrapper showBack backPath="/" padBottom={false}>
@@ -31,26 +100,30 @@ export default function OutcomeSignal() {
             DECISION
           </div>
           <div className="font-sans text-[14px] text-am-text-primary leading-relaxed">
-            "{MOCK_DATA.lastDecision}"
+            "{decision.decision_text}"
           </div>
-          <div className="font-mono text-[10px] text-am-text-tertiary uppercase tracking-wider mt-3">
-            STATE AT TIME OF DECISION
-          </div>
-          <div className="font-mono text-[13px] text-am-amber mt-1">
-            {MOCK_DATA.currentState}
-          </div>
+          {decision.detected_state_at_decision && (
+            <>
+              <div className="font-mono text-[10px] text-am-text-tertiary uppercase tracking-wider mt-3">
+                STATE AT TIME OF DECISION
+              </div>
+              <div className="font-mono text-[13px] text-am-amber mt-1">
+                {decision.detected_state_at_decision}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Response options */}
         <div className="mt-8 space-y-3">
-          {options.map((label) => (
+          {options.map((opt) => (
             <button
-              key={label}
-              onClick={handleSelect}
+              key={opt.value}
+              onClick={() => handleSelect(opt.value)}
               className="card-surface w-full p-4 rounded-lg text-left font-sans text-[14px] text-am-text-primary hover:border-am-border-active transition-colors"
-              aria-label={label}
+              aria-label={opt.label}
             >
-              {label}
+              {opt.label}
             </button>
           ))}
         </div>

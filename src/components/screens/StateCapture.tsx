@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
+import { useAppContext } from '@/context/AppContext';
 
 const CONTEXT_TAGS = ['Investor Meeting', 'Team Decision', 'Client Call', 'Strategic Planning', 'Financial Decision', 'Personal', 'Other'];
 
 export default function StateCapture() {
   const navigate = useNavigate();
+  const { dispatch } = useAppContext();
   const [text, setText] = useState('');
   const [tags, setTags] = useState<string[]>([]);
 
@@ -25,7 +27,13 @@ export default function StateCapture() {
   };
 
   const handleSubmit = () => {
-    if (canSubmit) navigate('/classification-loading');
+    if (!canSubmit) return;
+    // Store session data in context and navigate to loading
+    dispatch({
+      type: 'START_SESSION',
+      payload: { type: 'state_capture', rawText: text, contextTags: tags },
+    });
+    navigate('/classification-loading');
   };
 
   return (

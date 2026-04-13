@@ -1,13 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
-import { MOCK_DATA } from '@/context/AppContext';
+import { SUB_PROMPTS } from '@/lib/content-templates';
 
-const subPrompts = [
-  'What did you notice about how you were feeling in the lead-up?',
-  'Looking back, what would you do differently — if anything?',
-  'What does this tell you about how you make decisions under pressure?',
-];
+// TODO Phase C: Load real reflection from DB, save response + IAS
+// For now, shows a placeholder prompt
 
 export default function ReflectionA() {
   const navigate = useNavigate();
@@ -34,17 +31,10 @@ export default function ReflectionA() {
         <div className="text-micro italic">post_outcome</div>
       </div>
 
-      {/* Context header */}
-      <div className="border-l-2 border-am-amber pl-3 py-2 mt-4">
-        <div className="font-mono text-[12px] text-am-text-primary">
-          ANXIOUS VIGILANCE → HARDER THAN EXPECTED
-        </div>
-      </div>
-
       <div className="divider mt-4" />
 
       <p className="font-sans text-[17px] text-am-text-primary leading-[1.7] mt-4">
-        {MOCK_DATA.reflectionPromptA}
+        What do you notice about how this decision played out relative to the state you were in?
       </p>
 
       <textarea
@@ -59,7 +49,7 @@ export default function ReflectionA() {
 
       {/* Sub-prompts */}
       <div className="mt-4 space-y-1">
-        {subPrompts.map((prompt, i) => (
+        {SUB_PROMPTS.map((prompt, i) => (
           <div key={i} className="border-b border-am-border">
             <button
               onClick={() => toggleExpand(i)}

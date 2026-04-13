@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
+import { useAppContext } from '@/context/AppContext';
+import { getRecommendedTechnique, CognitiveStateId } from '@/lib/content-templates';
+
+function stateNameToId(name: string): CognitiveStateId {
+  return name.toLowerCase().replace(/\s+/g, '-') as CognitiveStateId;
+}
 
 const techniques = [
   {
@@ -31,11 +37,16 @@ const techniques = [
 
 export default function TechniqueSelection() {
   const navigate = useNavigate();
-  const [selected, setSelected] = useState<number | null>(null);
+  const { state } = useAppContext();
+  const session = state.activeSession;
+  const detectedState = session?.userCorrectedState || session?.classification?.detected_state || '';
+  const recommendedId = getRecommendedTechnique(stateNameToId(detectedState));
 
-  const handleSelect = (i: number) => {
-    setSelected(i);
-  };
+  // Pre-select recommended technique
+  const recommendedIndex = recommendedId
+    ? techniques.findIndex(t => t.id === recommendedId)
+    : null;
+  const [selected, setSelected] = useState<number | null>(recommendedIndex);
 
   const handleContinue = () => {
     if (selected === null) return;
@@ -52,13 +63,18 @@ export default function TechniqueSelection() {
         {techniques.map((t, i) => (
           <button
             key={t.id}
-            onClick={() => handleSelect(i)}
+            onClick={() => setSelected(i)}
             className={`card-surface p-4 text-left transition-all duration-150 ${
               selected === i ? 'border-am-border-active border-l-[3px] border-l-am-teal' : 'border-l-[3px] border-l-transparent'
             }`}
             aria-label={t.name}
           >
-            <div className="font-mono font-medium text-[14px] text-am-text-primary">{t.name}</div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-medium text-[14px] text-am-text-primary">{t.name}</span>
+              {recommendedId === t.id && (
+                <span className="text-[9px] font-mono text-am-teal bg-am-bg-tertiary px-1.5 py-0.5 rounded">RECOMMENDED</span>
+              )}
+            </div>
             {'subtitle' in t && t.subtitle && (
               <p className="text-small mt-1">{t.subtitle}</p>
             )}

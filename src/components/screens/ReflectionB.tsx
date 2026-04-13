@@ -1,13 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
-import { MOCK_DATA } from '@/context/AppContext';
+import { SUB_PROMPTS } from '@/lib/content-templates';
 
-const subPrompts = [
-  'What did you notice about how you were feeling in the lead-up?',
-  'Looking back, what would you do differently — if anything?',
-  'What does this tell you about how you make decisions under pressure?',
-];
+// TODO Phase C: Load real pattern + reflection from DB, save response + IAS
 
 export default function ReflectionB() {
   const navigate = useNavigate();
@@ -33,24 +29,17 @@ export default function ReflectionB() {
         <div className="font-mono text-[11px] text-am-purple italic">post_pattern</div>
       </div>
 
-      {/* Pattern detection header */}
+      {/* Pattern detection header — placeholder */}
       <div className="mt-4 p-4 rounded" style={{ backgroundColor: 'hsl(270, 18%, 11%)' }}>
         <div className="font-mono font-medium text-[10px] tracking-[0.08em] uppercase text-am-purple">PATTERN DETECTED</div>
-        <p className="font-mono text-[14px] text-am-text-primary mt-2">{MOCK_DATA.detectedPattern}</p>
-        <div className="text-micro mt-2">Based on {MOCK_DATA.patternDecisions} decisions — early signal</div>
+        <p className="font-mono text-[14px] text-am-text-primary mt-2">Pattern data loading...</p>
+        <div className="text-micro mt-2">Early signal</div>
       </div>
 
       <div className="divider mt-4" />
 
-      {/* Context header */}
-      <div className="border-l-2 border-am-amber pl-3 py-2 mt-4">
-        <div className="font-mono text-[12px] text-am-text-primary">
-          ANXIOUS VIGILANCE → HARDER THAN EXPECTED
-        </div>
-      </div>
-
       <p className="font-sans text-[17px] text-am-text-primary leading-[1.7] mt-4">
-        {MOCK_DATA.reflectionPromptB}
+        What do you make of this recurring pattern in your decision-making?
       </p>
 
       <textarea
@@ -65,7 +54,7 @@ export default function ReflectionB() {
 
       {/* Sub-prompts */}
       <div className="mt-4 space-y-1">
-        {subPrompts.map((prompt, i) => (
+        {SUB_PROMPTS.map((prompt, i) => (
           <div key={i} className="border-b border-am-border">
             <button
               onClick={() => toggleExpand(i)}
