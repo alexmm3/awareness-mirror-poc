@@ -33,7 +33,7 @@ export default function Waitlist() {
           REQUEST ACCESS →
         </button>
 
-        <button onClick={() => navigate('/onboarding')} className="ghost-link mt-4">
+        <button onClick={() => navigate('/auth')} className="ghost-link mt-4">
           Have access? Sign in →
         </button>
       </div>

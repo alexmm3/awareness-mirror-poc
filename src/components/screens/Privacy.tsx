@@ -1,8 +1,31 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Privacy() {
   const navigate = useNavigate();
+  const { user, refreshProfile } = useAuth();
+  const [hrvConsent, setHrvConsent] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleContinue = async () => {
+    if (!user) return;
+    setSaving(true);
+
+    await supabase
+      .from('profiles')
+      .update({
+        hrv_consent_given: hrvConsent,
+        onboarding_complete: true,
+      })
+      .eq('id', user.id);
+
+    await refreshProfile();
+    setSaving(false);
+    navigate('/');
+  };
 
   return (
     <ScreenWrapper showBack backPath="/disclaimer" padBottom={false}>
@@ -25,14 +48,27 @@ export default function Privacy() {
             <span className="text-small">Apple Health HRV</span>
             <p className="text-micro mt-1">Enables biometric grounding in a future update</p>
           </div>
-          <div className="w-10 h-5 bg-am-bg-tertiary rounded-full flex items-center px-0.5">
-            <div className="w-4 h-4 bg-am-text-tertiary rounded-full" />
-          </div>
+          <button
+            onClick={() => setHrvConsent(!hrvConsent)}
+            className={`w-10 h-5 rounded-full flex items-center px-0.5 transition-colors ${
+              hrvConsent ? 'bg-am-teal justify-end' : 'bg-am-bg-tertiary'
+            }`}
+            aria-label="Toggle HRV consent"
+          >
+            <div className={`w-4 h-4 rounded-full transition-colors ${
+              hrvConsent ? 'bg-white' : 'bg-am-text-tertiary'
+            }`} />
+          </button>
         </div>
       </div>
 
-      <button onClick={() => navigate('/auth')} className="btn-primary btn-teal mt-8 mb-8" aria-label="Continue">
-        CONTINUE →
+      <button
+        onClick={handleContinue}
+        disabled={saving}
+        className="btn-primary btn-teal mt-8 mb-8"
+        aria-label="Continue"
+      >
+        {saving ? 'SAVING...' : 'CONTINUE →'}
       </button>
     </ScreenWrapper>
   );

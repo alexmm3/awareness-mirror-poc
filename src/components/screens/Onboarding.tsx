@@ -1,15 +1,36 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 const roles = ['Founder', 'Executive', 'Operator', 'Investor', 'Other'];
 const decisionTypes = ['People', 'Strategy', 'Financial', 'Product', 'Partnerships', 'Mixed'];
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const { user, refreshProfile } = useAuth();
   const [step, setStep] = useState(1);
   const [role, setRole] = useState('');
   const [decisionType, setDecisionType] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleFinish = async () => {
+    if (!user || !decisionType) return;
+    setSaving(true);
+
+    await supabase
+      .from('profiles')
+      .update({
+        role,
+        decision_type: decisionType,
+      })
+      .eq('id', user.id);
+
+    await refreshProfile();
+    setSaving(false);
+    navigate('/disclaimer');
+  };
 
   return (
     <ScreenWrapper showBack backPath="/waitlist" padBottom={false}>
@@ -59,12 +80,12 @@ export default function Onboarding() {
             ))}
           </div>
           <button
-            onClick={() => navigate('/disclaimer')}
-            disabled={!decisionType}
+            onClick={handleFinish}
+            disabled={!decisionType || saving}
             className="btn-primary btn-teal mt-8"
             aria-label="Continue"
           >
-            CONTINUE →
+            {saving ? 'SAVING...' : 'CONTINUE →'}
           </button>
         </div>
       )}

@@ -1,17 +1,35 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Disclaimer() {
   const navigate = useNavigate();
+  const { user, refreshProfile } = useAuth();
   const [scrolledToBottom, setScrolledToBottom] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [saving, setSaving] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = () => {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
     if (scrollTop + clientHeight >= scrollHeight - 10) setScrolledToBottom(true);
+  };
+
+  const handleContinue = async () => {
+    if (!user || !agreed) return;
+    setSaving(true);
+
+    await supabase
+      .from('profiles')
+      .update({ disclaimer_accepted_at: new Date().toISOString() })
+      .eq('id', user.id);
+
+    await refreshProfile();
+    setSaving(false);
+    navigate('/privacy');
   };
 
   return (
@@ -53,12 +71,12 @@ export default function Disclaimer() {
       </div>
 
       <button
-        onClick={() => navigate('/privacy')}
-        disabled={!agreed}
+        onClick={handleContinue}
+        disabled={!agreed || saving}
         className="btn-primary btn-teal mt-6 mb-8"
         aria-label="Continue"
       >
-        CONTINUE →
+        {saving ? 'SAVING...' : 'CONTINUE →'}
       </button>
     </ScreenWrapper>
   );
