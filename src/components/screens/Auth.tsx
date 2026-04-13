@@ -50,11 +50,20 @@ export default function Auth() {
   return (
     <ScreenWrapper padBottom={false}>
       <div className="flex flex-col items-center justify-center min-h-[70vh]">
-        <h1 className="font-mono-display text-[22px] text-am-text-primary">
-          {mode === 'signin' ? 'Sign in' : 'Create account'}
+        <h1 className="font-mono-display text-[28px] text-am-text-primary tracking-[-0.02em]">
+          AWARENESS MIRROR
         </h1>
+        <p className="text-body text-am-text-secondary mt-2">
+          Decision Intelligence for founders.
+        </p>
 
-        <div className="w-full max-w-[320px] mt-8 space-y-3">
+        <div className="divider mt-8 w-full max-w-[320px]" />
+
+        <div className="font-mono text-[12px] text-am-text-tertiary uppercase tracking-[0.08em] mt-6">
+          {mode === 'signin' ? 'Sign in' : 'Create account'}
+        </div>
+
+        <div className="w-full max-w-[320px] mt-4 space-y-3">
           <input
             type="email"
             placeholder="Email"
