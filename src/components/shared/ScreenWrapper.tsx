@@ -23,6 +23,21 @@ export default function ScreenWrapper({ children, showBack, backPath, padBottom 
         </button>
       )}
       {children}
+
+      {/* Footer */}
+      <div className="pt-8 pb-4 text-center">
+        <span className="font-mono text-[10px] text-am-text-tertiary tracking-[0.04em]">
+          Proof of concept version. Designed by{' '}
+          <a
+            href="https://orangesoft.co"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-am-text-secondary hover:text-am-text-primary transition-colors"
+          >
+            Orangesoft
+          </a>
+        </span>
+      </div>
     </div>
   );
 }
