@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { MessageSquare } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 
@@ -35,11 +36,12 @@ export default function FeedbackButton() {
       {/* Floating feedback button */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed top-4 right-4 z-40 w-8 h-8 flex items-center justify-center rounded-full bg-am-bg-tertiary border border-am-border text-am-text-tertiary hover:text-am-text-secondary hover:border-am-border-active transition-colors"
+        className="fixed top-4 right-4 z-40 h-11 px-4 flex items-center gap-2 rounded-full bg-am-bg-tertiary border border-am-border-active text-am-text-secondary hover:text-am-text-primary hover:bg-am-bg-secondary transition-colors shadow-lg"
         aria-label="Send feedback"
         title="Send feedback"
       >
-        <span className="text-[14px]">?</span>
+        <MessageSquare size={14} strokeWidth={1.75} />
+        <span className="font-mono text-[11px] tracking-[0.08em] uppercase">Feedback</span>
       </button>
 
       {/* Modal overlay */}

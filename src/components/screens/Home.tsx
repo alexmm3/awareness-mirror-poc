@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
 import { useAuth } from '@/context/AuthContext';
+import { useAppContext } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 
 // Metric display helper: shows counter when building, trend when ready
@@ -79,6 +80,7 @@ function timeAgo(dateStr: string): string {
 export default function Home() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const { dispatch } = useAppContext();
   const [data, setData] = useState<HomeData>({
     lastState: null, lastActivation: 0, lastSessionAgo: '',
     userRole: null, userDecisionType: null,
@@ -89,6 +91,14 @@ export default function Home() {
     pendingReflectionId: null, pendingReflectionType: null,
   });
   const [loading, setLoading] = useState(true);
+
+  // Home is the canonical "between sessions" surface — clear any stale
+  // activeSession left behind by interrupted flows (back button, sign-out,
+  // accidental navigation). Prevents showing previous session data in a
+  // fresh Decision Capture or similar screens.
+  useEffect(() => {
+    dispatch({ type: 'CLEAR_SESSION' });
+  }, [dispatch]);
 
   useEffect(() => {
     if (!user) return;

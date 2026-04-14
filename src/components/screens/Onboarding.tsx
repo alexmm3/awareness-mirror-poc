@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
 const roles = ['Founder', 'Executive', 'Operator', 'Investor', 'Other'];
-const decisionTypes = ['People', 'Strategy', 'Financial', 'Product', 'Partnerships', 'Mixed'];
+const decisionTypes = ['People', 'Strategy', 'Money', 'Operations'];
 
 export default function Onboarding() {
   const navigate = useNavigate();

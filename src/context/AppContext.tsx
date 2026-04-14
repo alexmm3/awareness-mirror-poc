@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef, ReactNode } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 // Classification result from the Edge Function
 export interface ClassificationResult {
@@ -108,6 +109,23 @@ const AppContext = createContext<{
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  const { user } = useAuth();
+  const lastUserIdRef = useRef<string | null>(null);
+
+  // Clear active session whenever the authenticated user changes (sign-out,
+  // sign-in as another account). Prevents session data from one user leaking
+  // into another user's context after a user switch.
+  useEffect(() => {
+    const currentUserId = user?.id ?? null;
+    if (lastUserIdRef.current !== currentUserId) {
+      if (lastUserIdRef.current !== null) {
+        // User changed (not the initial mount) — clear any in-flight session.
+        dispatch({ type: 'CLEAR_SESSION' });
+      }
+      lastUserIdRef.current = currentUserId;
+    }
+  }, [user?.id]);
+
   return (
     <AppContext.Provider value={{ state, dispatch }}>
       {children}

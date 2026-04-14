@@ -195,7 +195,22 @@ export default function DecisionCapture() {
         {saving ? 'SAVING...' : 'LOG THIS DECISION →'}
       </button>
 
-      <button onClick={() => navigate('/technique-selection')} className="ghost-link block mx-auto mt-3 mb-8">
+      <button
+        onClick={() => {
+          // Skip without logging a decision.
+          // In-session: continue to stabilisation with the auto-selected technique.
+          // Standalone: just return to Home.
+          if (session?.classification) {
+            const stateId = (session?.userCorrectedState || session?.classification?.detected_state || '')
+              .toLowerCase().replace(/\s+/g, '-') as CognitiveStateId;
+            const technique = getRecommendedTechnique(stateId) || 'breathing-4-6';
+            navigate(`/stabilisation?technique=${technique}`);
+          } else {
+            navigate('/');
+          }
+        }}
+        className="ghost-link block mx-auto mt-3 mb-8"
+      >
         Skip →
       </button>
     </ScreenWrapper>

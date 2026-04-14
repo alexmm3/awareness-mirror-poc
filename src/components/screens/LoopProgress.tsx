@@ -35,7 +35,7 @@ export default function LoopProgress() {
   // 5-node loop steps completed so far in the current cycle
   // State Capture (done) + Decision (maybe) + Outcome + Pattern + Reflection
   const stepsInLoop = Math.min(completeLoops >= 1 ? 5 : 3, 5); // simplified: show progress
-  const decisionsToPattern = Math.max(0, 2 - completeLoops);
+  const loopsToPattern = Math.max(0, 2 - completeLoops);
 
   return (
     <ScreenWrapper showBack backPath="/observer-strength" padBottom={false}>
@@ -60,9 +60,9 @@ export default function LoopProgress() {
               ))}
             </div>
 
-            {!hasPattern && decisionsToPattern > 0 && (
+            {!hasPattern && loopsToPattern > 0 && (
               <p className="text-body text-am-text-secondary mt-4">
-                {decisionsToPattern} more decision{decisionsToPattern !== 1 ? 's' : ''} to your first pattern
+                {loopsToPattern} more complete loop{loopsToPattern !== 1 ? 's' : ''} to your first pattern
               </p>
             )}
 
