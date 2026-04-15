@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { getRandomReflection, CognitiveStateId } from '@/lib/content-templates';
 
 interface StateFreq {
   state: string;
@@ -14,6 +15,22 @@ interface PatternItem {
   text: string;
   decisions: number;
   confidence: number;
+}
+
+/** Parse "You tend to enter Cognitive Depletion before Team Decision." → "cognitive-depletion" */
+function extractStateIdFromPatternText(patternText: string): CognitiveStateId | null {
+  const match = patternText.match(/enter\s+([A-Za-z\s]+?)\s+before/i);
+  if (!match) return null;
+  const raw = match[1].trim().toLowerCase().replace(/\s+/g, '-');
+  const validIds: CognitiveStateId[] = [
+    'anxious-vigilance',
+    'focused-tension',
+    'calm-readiness',
+    'cognitive-depletion',
+    'flat-disconnection',
+    'reactive-activation',
+  ];
+  return validIds.includes(raw as CognitiveStateId) ? (raw as CognitiveStateId) : null;
 }
 
 export default function Dashboard() {
@@ -109,6 +126,67 @@ export default function Dashboard() {
     }
 
     setLoading(false);
+  };
+
+  // When the user taps "Explore in reflection" on a specific pattern card:
+  // find or create a post_pattern reflection tied to that pattern, then
+  // navigate to /reflection-b?pattern=<id>. This gives the Dashboard its
+  // own entry point into the reflection flow, independent of the Outcome
+  // Signal cycle. No duplicate reflections are created.
+  const handleExploreReflection = async (pattern: PatternItem) => {
+    if (!user) return;
+
+    // 1. Is there already a pending post_pattern reflection for this pattern?
+    const { data: existing } = await supabase
+      .from('reflections')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('pattern_id', pattern.id)
+      .eq('reflection_type', 'post_pattern')
+      .is('completed_at', null)
+      .maybeSingle();
+
+    if (!existing) {
+      // 2. Generate a prompt from templates for the state of this pattern.
+      //    Dashboard-initiated reflection is not tied to a specific outcome,
+      //    so we skip the "This decision went {outcome}" clause and keep
+      //    just the "We noticed {pattern}." opener + the trailing question.
+      //    Template shape: "We noticed {pattern}. This decision went {outcome}. {question}"
+      const stateId = extractStateIdFromPatternText(pattern.text);
+      const tpl = stateId ? getRandomReflection(stateId, 'post_pattern') : null;
+
+      // Reformat pattern text so it reads naturally inside "We noticed ...":
+      // "You tend to enter X before Y." → "you tend to enter X before Y"
+      const patternFragment = pattern.text
+        .replace(/\.$/, '')
+        .replace(/^You\b/, 'you');
+
+      let promptText: string;
+      if (tpl) {
+        // Extract the question (everything after the 2nd period + space).
+        // parts[0] = "We noticed {pattern}"
+        // parts[1] = "This decision went {outcome}"
+        // parts[2..] = rest of the sentence (question)
+        const parts = tpl.template.split('. ');
+        const question = parts.slice(2).join('. ').trim();
+        promptText = `We noticed ${patternFragment}. ${question}`;
+      } else {
+        promptText = `We noticed ${patternFragment}. What do you make of this?`;
+      }
+
+      // 3. Create the reflection. decision_id is null — this reflection
+      //    is about the pattern itself, not any single decision.
+      await supabase.from('reflections').insert({
+        user_id: user.id,
+        pattern_id: pattern.id,
+        decision_id: null,
+        reflection_type: 'post_pattern',
+        prompt_text: promptText,
+        reflection_due_at: new Date().toISOString(),
+      });
+    }
+
+    navigate(`/reflection-b?pattern=${pattern.id}`);
   };
 
   // SVG sparkline
@@ -278,16 +356,16 @@ export default function Dashboard() {
                   {p.text}
                 </p>
                 <div className="text-micro mt-2">Based on {p.decisions} session{p.decisions !== 1 ? 's' : ''}</div>
+                <button
+                  onClick={() => handleExploreReflection(p)}
+                  className="ghost-link mt-3 !text-am-purple text-[12px]"
+                  aria-label={`Explore in reflection: ${p.text}`}
+                >
+                  Explore in reflection →
+                </button>
               </div>
             ))}
           </div>
-          <button
-            onClick={() => navigate('/reflection-b')}
-            className="ghost-link mt-4 !text-am-purple text-[13px]"
-            aria-label="Explore in reflection"
-          >
-            Explore in reflection →
-          </button>
         </div>
       )}
     </ScreenWrapper>

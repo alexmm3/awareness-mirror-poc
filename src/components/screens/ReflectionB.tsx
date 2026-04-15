@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -25,6 +25,8 @@ const ratingLabels: Record<string, string> = {
 export default function ReflectionB() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const patternIdParam = searchParams.get('pattern');
   const [reflection, setReflection] = useState<ReflectionData | null>(null);
   const [text, setText] = useState('');
   const [expanded, setExpanded] = useState<number[]>([]);
@@ -33,68 +35,82 @@ export default function ReflectionB() {
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from('reflections')
-      .select('id, prompt_text, decision_id, pattern_id')
-      .eq('user_id', user.id)
-      .eq('reflection_type', 'post_pattern')
-      .is('completed_at', null)
-      .order('reflection_due_at', { ascending: true })
-      .limit(1)
-      .single()
-      .then(async ({ data }) => {
-        if (!data) {
-          setLoading(false);
-          return;
-        }
 
-        let pattern_text: string | null = null;
-        let pattern_confidence = 0;
-        let pattern_decisions = 0;
-        let detected_state: string | null = null;
-        let outcome_rating: string | null = null;
+    const loadReflection = async () => {
+      // When opened via Dashboard's per-pattern Explore button we get a
+      // ?pattern=<id> query param — find the reflection for that specific
+      // pattern. Otherwise fall back to the oldest pending post_pattern
+      // reflection (used by Home CTA state 2 "Reflection waiting").
+      let query = supabase
+        .from('reflections')
+        .select('id, prompt_text, decision_id, pattern_id')
+        .eq('user_id', user.id)
+        .eq('reflection_type', 'post_pattern')
+        .is('completed_at', null);
 
-        if (data.pattern_id) {
-          const { data: patData } = await supabase
-            .from('patterns')
-            .select('pattern_text, pattern_confidence, supporting_session_ids')
-            .eq('id', data.pattern_id)
-            .single();
-          if (patData) {
-            pattern_text = patData.pattern_text;
-            pattern_confidence = patData.pattern_confidence;
-            pattern_decisions = patData.supporting_session_ids?.length || 0;
-          }
-        }
+      if (patternIdParam) {
+        query = query.eq('pattern_id', patternIdParam);
+      }
 
-        if (data.decision_id) {
-          const { data: decData } = await supabase
-            .from('decisions')
-            .select('detected_state_at_decision')
-            .eq('id', data.decision_id)
-            .single();
-          detected_state = decData?.detected_state_at_decision || null;
+      const { data } = await query
+        .order('reflection_due_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
 
-          const { data: outcomeData } = await supabase
-            .from('outcomes')
-            .select('outcome_rating')
-            .eq('decision_id', data.decision_id)
-            .single();
-          outcome_rating = outcomeData?.outcome_rating || null;
-        }
-
-        setReflection({
-          id: data.id,
-          prompt_text: data.prompt_text,
-          pattern_text,
-          pattern_confidence,
-          pattern_decisions,
-          detected_state,
-          outcome_rating,
-        });
+      if (!data) {
         setLoading(false);
+        return;
+      }
+
+      let pattern_text: string | null = null;
+      let pattern_confidence = 0;
+      let pattern_decisions = 0;
+      let detected_state: string | null = null;
+      let outcome_rating: string | null = null;
+
+      if (data.pattern_id) {
+        const { data: patData } = await supabase
+          .from('patterns')
+          .select('pattern_text, pattern_confidence, supporting_session_ids')
+          .eq('id', data.pattern_id)
+          .single();
+        if (patData) {
+          pattern_text = patData.pattern_text;
+          pattern_confidence = patData.pattern_confidence;
+          pattern_decisions = patData.supporting_session_ids?.length || 0;
+        }
+      }
+
+      if (data.decision_id) {
+        const { data: decData } = await supabase
+          .from('decisions')
+          .select('detected_state_at_decision')
+          .eq('id', data.decision_id)
+          .single();
+        detected_state = decData?.detected_state_at_decision || null;
+
+        const { data: outcomeData } = await supabase
+          .from('outcomes')
+          .select('outcome_rating')
+          .eq('decision_id', data.decision_id)
+          .single();
+        outcome_rating = outcomeData?.outcome_rating || null;
+      }
+
+      setReflection({
+        id: data.id,
+        prompt_text: data.prompt_text,
+        pattern_text,
+        pattern_confidence,
+        pattern_decisions,
+        detected_state,
+        outcome_rating,
       });
-  }, [user]);
+      setLoading(false);
+    };
+
+    loadReflection();
+  }, [user, patternIdParam]);
 
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
 
