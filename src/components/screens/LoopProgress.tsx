@@ -2,20 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenWrapper from '@/components/shared/ScreenWrapper';
 import { useAuth } from '@/context/AuthContext';
-import { useAppContext } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
-import { getRecommendedTechnique, CognitiveStateId } from '@/lib/content-templates';
-
-function stateNameToId(name: string): CognitiveStateId {
-  return name.toLowerCase().replace(/\s+/g, '-') as CognitiveStateId;
-}
 
 export default function LoopProgress() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { state: appState } = useAppContext();
-  const session = appState.activeSession;
-  const detectedState = session?.userCorrectedState || session?.classification?.detected_state || '';
   const [completeLoops, setCompleteLoops] = useState(0);
   const [hasPattern, setHasPattern] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -75,10 +66,11 @@ export default function LoopProgress() {
         )}
       </div>
 
-      <button onClick={() => {
-        const techniqueId = getRecommendedTechnique(stateNameToId(detectedState)) || 'breathing-4-6';
-        navigate(`/stabilisation?technique=${techniqueId}`);
-      }} className="btn-primary btn-teal mt-8 mb-8" aria-label="Continue">
+      <button
+        onClick={() => navigate('/technique-selection')}
+        className="btn-primary btn-teal mt-8 mb-8"
+        aria-label="Continue"
+      >
         CONTINUE →
       </button>
     </ScreenWrapper>

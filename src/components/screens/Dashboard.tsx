@@ -9,6 +9,13 @@ interface StateFreq {
   count: number;
 }
 
+interface PatternItem {
+  id: string;
+  text: string;
+  decisions: number;
+  confidence: number;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -16,7 +23,7 @@ export default function Dashboard() {
   const [stateFrequency, setStateFrequency] = useState<StateFreq[]>([]);
   const [cnrData, setCnrData] = useState<number[]>([]);
   const [observerTrend, setObserverTrend] = useState<string | null>(null);
-  const [pattern, setPattern] = useState<{ text: string; decisions: number; confidence: number } | null>(null);
+  const [patterns, setPatterns] = useState<PatternItem[]>([]);
   const [totalSessions, setTotalSessions] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -38,7 +45,7 @@ export default function Dashboard() {
       ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
       : '1970-01-01T00:00:00Z';
 
-    const [sessionsRes, metricsRes, patternRes] = await Promise.all([
+    const [sessionsRes, metricsRes, patternsRes] = await Promise.all([
       supabase.from('sessions')
         .select('detected_state, user_corrected_state, recheck_clarity')
         .eq('user_id', user.id)
@@ -46,11 +53,9 @@ export default function Dashboard() {
         .order('created_at', { ascending: true }),
       supabase.from('user_metrics').select('*').eq('user_id', user.id).single(),
       supabase.from('patterns')
-        .select('pattern_text, pattern_confidence, supporting_session_ids')
+        .select('id, pattern_text, pattern_confidence, supporting_session_ids, viewed')
         .eq('user_id', user.id)
-        .order('detected_at', { ascending: false })
-        .limit(1)
-        .single(),
+        .order('detected_at', { ascending: false }),
     ]);
 
     const sessions = sessionsRes.data || [];
@@ -79,13 +84,28 @@ export default function Dashboard() {
     const metrics = metricsRes.data;
     setObserverTrend(metrics?.observer_strength_trend || null);
 
-    // Pattern
-    if (patternRes.data) {
-      setPattern({
-        text: patternRes.data.pattern_text,
-        decisions: patternRes.data.supporting_session_ids?.length || 0,
-        confidence: patternRes.data.pattern_confidence,
-      });
+    // Patterns: sort by strongest first (supporting sessions count DESC),
+    // then by recency. Mark all unviewed patterns as viewed so the Home
+    // CTA stops surfacing them after the user has seen them here.
+    const rawPatterns = patternsRes.data || [];
+    const sortedPatterns: PatternItem[] = [...rawPatterns]
+      .sort((a, b) => {
+        const aCount = a.supporting_session_ids?.length || 0;
+        const bCount = b.supporting_session_ids?.length || 0;
+        return bCount - aCount;
+      })
+      .map((p) => ({
+        id: p.id,
+        text: p.pattern_text,
+        decisions: p.supporting_session_ids?.length || 0,
+        confidence: p.pattern_confidence,
+      }));
+    setPatterns(sortedPatterns);
+
+    const unviewedIds = rawPatterns.filter((p) => !p.viewed).map((p) => p.id);
+    if (unviewedIds.length > 0) {
+      // Fire-and-forget: marking viewed doesn't block the dashboard render.
+      supabase.from('patterns').update({ viewed: true }).in('id', unviewedIds).then(() => {});
     }
 
     setLoading(false);
@@ -236,31 +256,38 @@ export default function Dashboard() {
 
       <div className="divider mt-6" />
 
-      {/* Pattern Preview */}
-      {pattern && (
+      {/* Patterns */}
+      {patterns.length > 0 && (
         <div className="mt-6 mb-8">
-          <div className="font-mono font-medium text-[10px] tracking-[0.08em] uppercase text-am-purple">PATTERN DETECTED</div>
-          <div
-            className="mt-3 p-4 rounded"
-            style={{ backgroundColor: 'hsl(270, 25%, 9%)', border: '1px solid hsl(258, 38%, 38%)' }}
-          >
-            {pattern.confidence < 1 && (
-              <div className="font-mono text-[9px] tracking-[0.08em] uppercase" style={{ color: 'hsl(258, 28%, 50%)' }}>
-                EARLY SIGNAL — NOT YET CONFIRMED
-              </div>
-            )}
-            <p className="font-mono text-[15px] text-am-text-primary italic mt-2">
-              {pattern.text}
-            </p>
-            <div className="text-micro mt-2">Based on {pattern.decisions} decisions</div>
-            <button
-              onClick={() => navigate('/reflection-b')}
-              className="ghost-link mt-3 !text-am-purple text-[13px]"
-              aria-label="Explore in reflection"
-            >
-              Explore in reflection →
-            </button>
+          <div className="font-mono font-medium text-[10px] tracking-[0.08em] uppercase text-am-purple">
+            {patterns.length === 1 ? 'PATTERN DETECTED' : `${patterns.length} PATTERNS DETECTED`}
           </div>
+          <div className="mt-3 space-y-3">
+            {patterns.map((p) => (
+              <div
+                key={p.id}
+                className="p-4 rounded"
+                style={{ backgroundColor: 'hsl(270, 25%, 9%)', border: '1px solid hsl(258, 38%, 38%)' }}
+              >
+                {p.confidence < 1 && (
+                  <div className="font-mono text-[9px] tracking-[0.08em] uppercase" style={{ color: 'hsl(258, 28%, 50%)' }}>
+                    EARLY SIGNAL — NOT YET CONFIRMED
+                  </div>
+                )}
+                <p className="font-mono text-[15px] text-am-text-primary italic mt-2">
+                  {p.text}
+                </p>
+                <div className="text-micro mt-2">Based on {p.decisions} session{p.decisions !== 1 ? 's' : ''}</div>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => navigate('/reflection-b')}
+            className="ghost-link mt-4 !text-am-purple text-[13px]"
+            aria-label="Explore in reflection"
+          >
+            Explore in reflection →
+          </button>
         </div>
       )}
     </ScreenWrapper>

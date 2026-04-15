@@ -303,6 +303,9 @@ export default function Home() {
           </button>
 
           <div className="flex flex-col gap-2 mt-4">
+            {data.ctaState !== 4 && (
+              <button onClick={() => navigate('/state-capture')} className="ghost-link text-left">→ Begin a new session</button>
+            )}
             <button onClick={() => navigate('/high-pressure')} className="ghost-link text-left">→ High-pressure moment</button>
             <button onClick={() => navigate('/decision-capture')} className="ghost-link text-left">→ Log a decision</button>
           </div>

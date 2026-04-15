@@ -4,7 +4,6 @@ import ScreenWrapper from '@/components/shared/ScreenWrapper';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { getRecommendedTechnique, CognitiveStateId } from '@/lib/content-templates';
 
 const DECISION_TYPES = ['People', 'Money', 'Strategy', 'Operations'];
 
@@ -102,11 +101,10 @@ export default function DecisionCapture() {
     const hasActiveFlow = !!session?.classification;
     const handleContinue = () => {
       if (hasActiveFlow) {
-        const stateId = (session?.userCorrectedState || session?.classification?.detected_state || '')
-          .toLowerCase().replace(/\s+/g, '-') as CognitiveStateId;
-        const technique = getRecommendedTechnique(stateId) || 'breathing-4-6';
-        navigate(`/stabilisation?technique=${technique}`);
+        // In-session: continue the flow to the technique selection screen.
+        navigate('/technique-selection');
       } else {
+        // Standalone Decision Capture: return to Home.
         navigate('/');
       }
     };
@@ -198,13 +196,10 @@ export default function DecisionCapture() {
       <button
         onClick={() => {
           // Skip without logging a decision.
-          // In-session: continue to stabilisation with the auto-selected technique.
+          // In-session: continue to the technique selection screen.
           // Standalone: just return to Home.
           if (session?.classification) {
-            const stateId = (session?.userCorrectedState || session?.classification?.detected_state || '')
-              .toLowerCase().replace(/\s+/g, '-') as CognitiveStateId;
-            const technique = getRecommendedTechnique(stateId) || 'breathing-4-6';
-            navigate(`/stabilisation?technique=${technique}`);
+            navigate('/technique-selection');
           } else {
             navigate('/');
           }

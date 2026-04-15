@@ -14,6 +14,7 @@ import BehaviourSurface from "@/components/screens/BehaviourSurface";
 import ObserverStrength from "@/components/screens/ObserverStrength";
 import LoopProgress from "@/components/screens/LoopProgress";
 import DecisionCapture from "@/components/screens/DecisionCapture";
+import TechniqueSelection from "@/components/screens/TechniqueSelection";
 import Stabilisation from "@/components/screens/Stabilisation";
 import MicroAction from "@/components/screens/MicroAction";
 import ReCheck from "@/components/screens/ReCheck";
@@ -97,6 +98,7 @@ function AppRoutes() {
         <Route path="/observer-strength" element={<ObserverStrength />} />
         <Route path="/loop-progress" element={<LoopProgress />} />
         <Route path="/decision-capture" element={<DecisionCapture />} />
+        <Route path="/technique-selection" element={<TechniqueSelection />} />
         <Route path="/stabilisation" element={<Stabilisation />} />
         <Route path="/micro-action" element={<MicroAction />} />
         <Route path="/recheck" element={<ReCheck />} />

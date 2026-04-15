@@ -9,7 +9,7 @@ const HIDE_BOTTOM_NAV = [
   '/waitlist', '/auth', '/onboarding', '/disclaimer', '/privacy',
   '/state-capture', '/classification-loading', '/state-display',
   '/second-rank', '/behaviour-surface', '/observer-strength', '/loop-progress',
-  '/decision-capture', '/stabilisation', '/micro-action',
+  '/decision-capture', '/technique-selection', '/stabilisation', '/micro-action',
   '/recheck', '/session-close', '/high-pressure',
   '/outcome-signal', '/outcome-confirmation',
   '/reflection-a', '/reflection-b',

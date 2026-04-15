@@ -33,9 +33,8 @@ export default function Stabilisation() {
   const technique = (techniqueId && techniqueData[techniqueId]) || defaultTechnique;
 
   return (
-    <ScreenWrapper showBack backPath="/loop-progress" padBottom={false}>
+    <ScreenWrapper showBack backPath="/technique-selection" padBottom={false}>
       <div className="text-label mt-4">STABILISATION</div>
-      <p className="text-body text-am-text-secondary mt-2">Based on your current state, we recommend:</p>
 
       <div className="card-surface p-4 mt-6">
         <div className="font-mono font-medium text-[14px] text-am-text-primary">{technique.name}</div>
